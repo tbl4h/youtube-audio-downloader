@@ -1,0 +1,91 @@
+# Kompilowane pliki
+*.o
+*.so
+*.a
+*.exe
+*.dll
+*.dylib
+*.out
+
+# Build katalogi
+build/
+bin/
+lib/
+obj/
+external/
+cmake-build-*/
+.cmake/
+_deps/
+
+# Katalogi IDE
+.idea/
+.vscode/
+.vs/
+*.swp
+*~
+*.swo
+
+# Katalogi i pliki specyficzne dla projektu
+downloads/
+models/
+*.mp3
+*.mp4
+*.wav
+*.ogg
+*.flac
+*.bin
+*.ggml
+*.weight
+
+# Pliki konfiguracyjne
+Config.h
+config.ini
+*.config
+
+# Pliki tymczasowe
+temp/
+tmp/
+*.tmp
+*.temp
+
+# Cache CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+
+# Pliki tymczasowe generowane podczas transkrypcji
+*.txt
+*.srt
+*.vtt
+*.json
+
+# Zależności zewnętrzne
+external/
+whisper.cpp/
+yt-dlp/
+
+# Logi
+*.log
+logs/
+
+# Pakiety instalacyjne
+*.deb
+*.rpm
+*.pkg
+*.dmg
+
+# Katalogi użytkownika
+.local/
+.cache/
+
+# Środowisko
+.env
+.env.local
+.env.development
+.env.test
+.env.production
