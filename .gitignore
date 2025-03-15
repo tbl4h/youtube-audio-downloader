@@ -49,17 +49,17 @@ tmp/
 *.temp
 
 # Cache CMake
-CMakeCache.txt
-CMakeFiles/
-CMakeScripts/
-Testing/
-cmake_install.cmake
-install_manifest.txt
-compile_commands.json
-CTestTestfile.cmake
+#CMakeCache.txt
+#CMakeFiles/
+#CMakeScripts/
+#Testing/
+#cmake_install.cmake
+#install_manifest.txt
+#compile_commands.json
+#CTestTestfile.cmake
 
 # Pliki tymczasowe generowane podczas transkrypcji
-*.txt
+#*.txt
 *.srt
 *.vtt
 *.json
