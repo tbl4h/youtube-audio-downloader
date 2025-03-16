@@ -19,6 +19,10 @@
 // Dołączanie nagłówków whisper - musi być ostatnie!
 #include <whisper.h>
 
+#ifndef WHISPER_USE_OPENCL
+#define WHISPER_USE_OPENCL
+#endif
+
 namespace fs = std::filesystem;
 
 // USUNIĘTO redefinicję whisper_context_params i whisper_init_from_file_with_params
@@ -366,12 +370,35 @@ std::string Transcriber::transcribeAudio(const std::string& audioFilePath, bool 
         // Wyświetlenie informacji o systemie
         std::cout << "Informacje o systemie whisper: " << whisper_print_system_info() << std::endl;
         
+        // Dodaj przed inicjalizacją whisper:
+        std::cout << "Opóźnienie inicjalizacji OpenCL aby zainicjować GPU...\n";
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        
+        // Dodaj te zmienne środowiskowe przed inicjalizacją
+        setenv("GGML_OPENCL_SYNCHRONIZE", "1", 1);  // Wymusza synchronizację po każdej operacji
+        setenv("GGML_OPENCL_SEQUENTIAL", "1", 1);   // Sekwencyjne wykonywanie operacji
+
         // Próba inicjalizacji z GPU
         struct whisper_context_params params = whisper_context_default_params();
         
         if (useGPU) {
             std::cout << "Próba inicjalizacji modelu na GPU..." << std::endl;
             params.use_gpu = true;
+            params.gpu_device = 0;
+            
+            // Poniższe ustawienia powinny pomóc z kartą Intel Arc A770 16GB
+            setenv("GGML_OPENCL_PLATFORM", "Intel(R) OpenCL Graphics", 1);  // 1 zamiast 0, aby wymusić
+            setenv("GGML_OPENCL_DEVICE", "Intel(R) Arc(TM) A770 Graphics", 1);
+            
+            // Dodaj zmienne środowiskowe do kontroli bufora GPU
+            setenv("GGML_OPENCL_MAX_BUFFER_SIZE", "4096", 1);  // Limit bufora w MB (opcjonalnie)
+            // Dodaj przed uruchomieniem transkrypcji:
+            setenv("GGML_OPENCL_MAX_TENSOR_SIZE", "536870912", 1);  // Limit do 512MB
+            // Nie używamy split_size_mb, bo nie ma tego parametru w Twojej wersji whisper.cpp
+            
+            // Spróbuj wymusić prostszą implementację OpenCL
+            setenv("GGML_OPENCL_FORCE_BASIC", "1", 1);
+            
             whisperContext = whisper_init_from_file_with_params(modelPath.c_str(), params);
             
             if (whisperContext) {
@@ -392,9 +419,7 @@ std::string Transcriber::transcribeAudio(const std::string& audioFilePath, bool 
         }
     }
     
-    // Pozostała część funkcji bez zmian...
-    
-    // Przetwórz plik audio
+    // Wczytaj plik audio zamiast używania AudioUtils
     std::vector<float> audioData = processAudioFile(audioFilePath);
     
     // Przygotuj parametry whisper
@@ -406,32 +431,54 @@ std::string Transcriber::transcribeAudio(const std::string& audioFilePath, bool 
         wparams.translate = false;
     }
     
-    // Ustaw inne parametry
+    // Ustaw inne parametry - kluczowe ustawienia dla stabilności
     wparams.print_progress   = true;
     wparams.print_special    = false;
     wparams.print_realtime   = false;
     wparams.print_timestamps = false;
     
-    // Uruchom transkrypcję używając API whisper
-    std::cout << "Transkrypcja w toku..." << std::endl;
+    // Ustaw liczbę wątków na maksymalną dostępną w systemie
+    wparams.n_threads = std::thread::hardware_concurrency();
+    std::cout << "Używam " << wparams.n_threads << " wątków do transkrypcji" << std::endl;
     
-    if (whisper_full(static_cast<struct whisper_context*>(whisperContext), 
+    // Kluczowe ustawienia dla stabilności
+    wparams.no_context = true;          // Zapobiega błędom kontekstowym
+    wparams.max_tokens = 0;             // Bez limitu tokenów
+    wparams.audio_ctx = 512;           // Zmniejsz rozmiar kontekstu audio (domyślnie 1500)
+    wparams.strategy = WHISPER_SAMPLING_GREEDY; // Najprostsza strategia
+    wparams.temperature = 0.0f;         // Deterministic output
+    wparams.n_threads = std::min(4, (int)std::thread::hardware_concurrency());  // Ogranicz liczbę wątków dla stabilności
+
+    // Dodatkowe zmienne środowiskowe dla stabilności
+    setenv("GGML_OPENCL_DEQUANT", "0", 0);  // Wyłącz dekwantyzację na GPU
+
+    // Uruchamiamy z debugowaniem
+    std::cout << "Transkrypcja w toku...";
+    fflush(stdout);
+    
+    try {
+        // Wykonaj transkrypcję z dodatkowym zabezpieczeniem
+        if (whisper_full(static_cast<struct whisper_context*>(whisperContext), 
                     wparams, 
                     audioData.data(), 
                     audioData.size()) != 0) {
-        throw TranscriberException("Nie udało się wykonać transkrypcji");
+            throw TranscriberException("Nie udało się wykonać transkrypcji");
+        }
+        
+        // Pobierz wynik transkrypcji
+        std::string transcription;
+        const int n_segments = whisper_full_n_segments(static_cast<struct whisper_context*>(whisperContext));
+        
+        for (int i = 0; i < n_segments; ++i) {
+            const char* text = whisper_full_get_segment_text(static_cast<struct whisper_context*>(whisperContext), i);
+            transcription += text;
+            transcription += " ";
+        }
+        
+        std::cout << "\nTranskrypcja zakończona!" << std::endl;
+        return transcription;
+    } catch (const std::exception& e) {
+        std::cerr << "\nWystąpił błąd podczas transkrypcji: " << e.what() << std::endl;
+        throw TranscriberException("Błąd transkrypcji: " + std::string(e.what()));
     }
-    
-    // Pobierz wynik transkrypcji
-    std::string transcription;
-    const int n_segments = whisper_full_n_segments(static_cast<struct whisper_context*>(whisperContext));
-    
-    for (int i = 0; i < n_segments; ++i) {
-        const char* text = whisper_full_get_segment_text(static_cast<struct whisper_context*>(whisperContext), i);
-        transcription += text;
-        transcription += " ";
-    }
-    
-    std::cout << "\nTranskrypcja zakończona!" << std::endl;
-    return transcription;
 }

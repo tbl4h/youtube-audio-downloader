@@ -53,3 +53,37 @@ git clone https://github.com/ggerganov/whisper.cpp.git
 sudo apt install -y ocl-icd-opencl-dev ocl-icd-libopencl1 opencl-headers clinfo
 sudo apt install -y mesa-opencl-icd
 git clone https://github.com/CNugteren/CLBlast.git
+
+# Kompilacja whisper.cpp dla kart Intel Arc
+
+Aby skutecznie wykorzystać kartę graficzną Intel Arc do przyspieszenia transkrypcji, należy poprawnie skompilować bibliotekę whisper.cpp z obsługą OpenCL, unikając problemów z kompatybilnością.
+
+## Wymagania wstępne
+
+- Zainstalowane sterowniki Intel dla OpenCL
+- Pakiety deweloperskie OpenCL
+- CMake w wersji 3.10 lub nowszej
+- Kompilator C++ obsługujący C++17
+
+## Instalacja zależności
+
+```bash
+# Instalacja pakietów OpenCL
+sudo apt-get update
+sudo apt-get install -y ocl-icd-opencl-dev ocl-icd-libopencl1 opencl-headers clinfo
+
+# Instalacja sterowników Intel dla OpenCL
+sudo apt-get install -y intel-opencl-icd
+
+## Kompilacja whisper-cpp
+# Najpierw wyczyść poprzednie buildy
+make clean
+
+# Skonfiguruj z włączonym OpenCL i wyłączonymi kernelami Adreno
+cmake -B build -DWHISPER_OPENCL=ON -DGGML_OPENCL_USE_ADRENO_KERNELS=OFF
+
+# Skompiluj
+cmake --build build --config Release -j
+
+# Zainstaluj bibliotekę
+sudo cmake --install build

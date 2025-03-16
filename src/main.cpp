@@ -15,6 +15,7 @@
 #include <CL/cl.h>
 #endif
 
+
 // Funkcja do zapisu transkrypcji do pliku
 void saveTranscriptionToFile(const std::string& text, const std::string& filePath) {
     std::ofstream outFile(filePath);
@@ -106,6 +107,7 @@ int main(int argc, char* argv[]) {
                 // Wybór metody transkrypcji
                 bool useGPU = false;
                 bool isGPUSupported = isGPUAvailable();
+                
                 
                 if (isGPUSupported) {
                     std::cout << "Wykryto obsługę GPU. Czy chcesz użyć GPU do transkrypcji? (t/n): ";

@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 # Dodanie opcji kompilacji
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 option(USE_CUDA "Enable CUDA support" OFF)
-option(USE_OPENCL "Enable OpenCL support" ON)
+option(USE_OPENCL "Enable OpenCL support" ON)  # Domyślnie włączone
 
 set(EXTRA_LIBS "")
 
@@ -27,7 +27,7 @@ find_library(SWSCALE_LIBRARY swscale)
 
 # Szukanie biblioteki Whisper zainstalowanej globalnie
 find_path(WHISPER_INCLUDE_DIR whisper.h)
-find_library(WHISPER_LIBRARY NAMES whisper libwhisper HINTS /usr/local/lib/whisper)
+find_library(WHISPER_LIBRARY NAMES whisper libwhisper HINTS /usr/local/lib /usr/local/lib/whisper)
 
 # Sprawdzenie czy FFmpeg został znaleziony
 if(NOT AVCODEC_INCLUDE_DIR OR NOT AVCODEC_LIBRARY OR
@@ -58,19 +58,17 @@ endif()
 
 # Szukanie OpenCL jeśli włączone
 if(USE_OPENCL)
-    find_package(OpenCL)
+    find_package(OpenCL REQUIRED)
+
     if(OpenCL_FOUND)
-        # Szukanie CLBlast
-        find_library(CLBLAST_LIBRARY clblast)
-        if(CLBLAST_LIBRARY)
-            include_directories(${OpenCL_INCLUDE_DIRS})
-            add_definitions(-DWHISPER_USE_OPENCL)
-            list(APPEND EXTRA_LIBS ${OpenCL_LIBRARIES} ${CLBLAST_LIBRARY})  # Poprawiona nazwa zmiennej
-            message(STATUS "OpenCL support enabled with CLBlast")
-        else()
-            message(WARNING "CLBlast not found, disabling OpenCL acceleration")
-            set(USE_OPENCL OFF)
-        endif()
+        message(STATUS "OpenCL found: ${OpenCL_LIBRARIES}")
+        include_directories(${OpenCL_INCLUDE_DIRS})
+        
+        # Dodaj definicje preprocesora dla OpenCL
+        add_definitions(-DWHISPER_USE_OPENCL)
+        
+        list(APPEND EXTRA_LIBS ${OpenCL_LIBRARIES})
+        message(STATUS "OpenCL support enabled")
     else()
         message(WARNING "OpenCL not found, disabling GPU acceleration")
         set(USE_OPENCL OFF)
@@ -95,10 +93,6 @@ set(SOURCES
     src/utils/file_handler.cpp
     src/audio/converter.cpp
     src/transcriber/transcriber.cpp
-    # Usuwamy własne implementacje, ponieważ używamy systemowej biblioteki
-    # src/third_party/whisper/whisper.cpp
-    # src/third_party/whisper/ggml.cpp
-    # src/third_party/whisper/ggml-cpu.cpp
 )
 
 # Dodanie pliku wykonywalnego
@@ -113,7 +107,6 @@ target_link_libraries(YoutubeAudioDownloader
     ${SWSCALE_LIBRARY}
     ${WHISPER_LIBRARY}
     ${CMAKE_THREAD_LIBS_INIT}
-    /usr/local/lib/libwhisper.so.1.7.4
     ${EXTRA_LIBS}
 )
 
@@ -128,3 +121,4 @@ install(TARGETS YoutubeAudioDownloader DESTINATION bin)
 message(STATUS "CURL include dirs: ${CURL_INCLUDE_DIRS}")
 message(STATUS "Whisper include dir: ${WHISPER_INCLUDE_DIR}")
 message(STATUS "Whisper library: ${WHISPER_LIBRARY}")
+message(STATUS "Extra libraries: ${EXTRA_LIBS}")

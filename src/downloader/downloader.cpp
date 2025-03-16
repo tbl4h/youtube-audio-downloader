@@ -165,6 +165,15 @@ void Downloader::fetchVideoInfo() {
         // Replace invalid filename characters
         std::regex invalidChars(R"([\\/:*?"<>|])");
         videoTitle = std::regex_replace(videoTitle, invalidChars, "_");
+        
+        // Limit the length of the filename to avoid "filename too long" errors
+        // 80 characters is a safe limit for most filesystems
+        if (videoTitle.length() > 80) {
+            videoTitle = videoTitle.substr(0, 77) + "...";
+        }
+        
+        // Store also the video ID in the filename to ensure uniqueness
+        videoTitle = videoTitle + "_" + videoId;
     } catch (const std::exception& e) {
         throw DownloaderException("Failed to fetch video title: " + std::string(e.what()));
     }
